@@ -1,1 +1,598 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>3D Depth Stitcher – Top Component with Full Background Cutout</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0f1c;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            color: #eef2ff;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .container { max-width: 1500px; width: 100%; }
+        header { text-align: center; margin-bottom: 1.5rem; }
+        header h1 {
+            font-size: 1.9rem; font-weight: 700;
+            background: linear-gradient(135deg, #c084fc, #60a5fa);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .card {
+            background: #111827dd; backdrop-filter: blur(4px);
+            border: 1px solid #1e293b; border-radius: 1.5rem;
+            margin-bottom: 1.5rem; overflow: hidden;
+        }
+        .card-body { padding: 1.5rem; }
+        .upload-grid { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .upload-group {
+            flex: 1 1 170px; background: #0f172a60; border-radius: 1rem;
+            padding: 0.8rem; border: 1px solid #1e293b;
+        }
+        .upload-group label {
+            font-weight: 600; font-size: 0.8rem; display: flex; align-items: center;
+            gap: 0.3rem; margin-bottom: 0.5rem; color: #cbd5e6;
+        }
+        input[type="file"] {
+            width: 100%; background: #020617; border: 1px solid #334155;
+            border-radius: 0.75rem; padding: 0.5rem; color: white; font-size: 0.75rem;
+        }
+        .depth-hint { font-size: 0.65rem; color: #6c7c9e; margin-top: 0.3rem; }
+        
+        .controls-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem;
+            background: #0f172a40; padding: 1.2rem; border-radius: 1rem; border: 1px solid #1e293b;
+            margin-bottom: 1rem;
+        }
+        .slider-item { display: flex; flex-direction: column; gap: 0.4rem; }
+        .slider-item label { font-size: 0.8rem; font-weight: 600; display: flex; justify-content: space-between; }
+        .slider-item span { color: #60a5fa; font-family: monospace; }
+        input[type="range"] { width: 100%; accent-color: #3b82f6; cursor: pointer; }
+
+        .action-row {
+            display: flex; flex-wrap: wrap; align-items: center; gap: 1rem;
+            margin-top: 1rem; background: #0f172a60; padding: 1rem;
+            border-radius: 1rem; border: 1px solid #1e293b;
+        }
+        .action-row button {
+            background: #2563eb; border: none; color: white; font-weight: 600;
+            padding: 0.6rem 1.5rem; border-radius: 0.8rem; cursor: pointer;
+            font-size: 0.85rem; transition: 0.2s; border: 1px solid #3b82f6;
+        }
+        .action-row button:hover { background: #1d4ed8; }
+        .action-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        #viewer {
+            width: 100%; height: 560px; border-radius: 1.2rem; background: #030712;
+            border: 1px solid #1e293b; overflow: hidden;
+        }
+        .status {
+            text-align: center; margin-top: 1rem; font-size: 0.85rem; background: #0f172a80;
+            display: inline-block; padding: 0.4rem 1.2rem; border-radius: 30px;
+            backdrop-filter: blur(4px); width: 100%;
+        }
+        hr { border-color: #1e293b; margin: 0.5rem 0; }
+        .badge { background: #1e3a5f; border-radius: 20px; padding: 0.2rem 0.8rem; font-size: 0.7rem; display: inline-block; margin-left: 0.5rem; }
+        @media (max-width: 800px) { body { padding: 0.8rem; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>🧩 3D Depth Stitcher • Top Component Full Background Cutout</h1>
+    </header>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="upload-grid">
+                <div class="upload-group"><label>🎨 Front Image *</label><input type="file" id="frontImg" accept="image/*"><div class="depth-hint">📊 Front Depth TXT *</div><input type="file" id="frontDepth" accept=".txt"></div>
+                <div class="upload-group"><label>🔙 Back Image</label><input type="file" id="backImg" accept="image/*"><div class="depth-hint">📊 Back Depth TXT</div><input type="file" id="backDepth" accept=".txt"></div>
+                <div class="upload-group"><label>🧭 Left Image</label><input type="file" id="sideLeftImg" accept="image/*"><div class="depth-hint">📊 Left Depth TXT</div><input type="file" id="sideLeftDepth" accept=".txt"></div>
+                <div class="upload-group"><label>🧭 Right Image</label><input type="file" id="sideRightImg" accept="image/*"><div class="depth-hint">📊 Right Depth TXT</div><input type="file" id="sideRightDepth" accept=".txt"></div>
+                <div class="upload-group"><label>⬆️ Top Image</label><input type="file" id="topImg" accept="image/*"><div class="depth-hint">📊 Top Depth TXT (bg filter applied)</div><input type="file" id="topDepth" accept=".txt"></div>
+            </div>
+
+            <!-- Primary geometry controls -->
+            <div class="controls-grid">
+                <div class="slider-item"><label>🔻 Mesh Resolution (%) <span id="meshDetailVal">100</span></label><input type="range" id="meshDetail" min="10" max="100" step="5" value="100"></div>
+                <div class="slider-item"><label>🧹 Background Cutout <span id="bgThresholdVal">0.050</span><span class="badge">applies to ALL depth maps</span></label><input type="range" id="bgThreshold" min="0.0" max="0.35" step="0.005" value="0.05"></div>
+                <div class="slider-item"><label>✂️ Edge Filter (tear) <span id="tearThresholdVal">0.15</span></label><input type="range" id="tearThreshold" min="0.01" max="1.0" step="0.01" value="0.15"></div>
+                <div class="slider-item"><label>📏 Front Depth Factor <span id="frontDepthVal">1.20</span></label><input type="range" id="frontDepthFactor" min="0.1" max="3.8" step="0.05" value="1.2"></div>
+                <div class="slider-item"><label>📏 Back Depth Factor <span id="backDepthVal">1.20</span></label><input type="range" id="backDepthFactor" min="0.1" max="3.8" step="0.05" value="1.2"></div>
+                <div class="slider-item"><label>📐 Sides Depth Factor <span id="sideDepthVal">1.20</span></label><input type="range" id="sideDepth" min="0.1" max="3.8" step="0.05" value="1.2"></div>
+                <div class="slider-item"><label>🔝 Top Depth Factor <span id="topDepthVal">0.80</span></label><input type="range" id="topDepthFactor" min="0.1" max="3.5" step="0.05" value="0.8"></div>
+                <div class="slider-item"><label>↔️ Sides Length <span id="sidesLenVal">1.00</span></label><input type="range" id="sidesLen" min="0.1" max="2" step="0.01" value="1"></div>
+                <div class="slider-item"><label>📌 Sides In/Out Offset <span id="sidesDistVal">0.00</span></label><input type="range" id="sidesDist" min="-5" max="5" step="0.01" value="0"></div>
+            </div>
+
+            <!-- Top dimensions and transforms -->
+            <div class="controls-grid" style="border-top: 1px solid #2d3a5a;">
+                <div class="slider-item"><label>🔹 BACK Independent Offset Z <span id="backOffsetZVal">0.00</span></label><input type="range" id="backOffsetZ" min="-2.0" max="2.0" step="0.02" value="0"></div>
+                <div class="slider-item"><label>📏 Top Width (X axis) <span id="topWidthVal">4.00</span></label><input type="range" id="topWidth" min="0.8" max="7.0" step="0.05" value="4.0"></div>
+                <div class="slider-item"><label>📏 Top Breadth (Z axis) <span id="topDepthDimVal">2.50</span></label><input type="range" id="topDepthDim" min="0.8" max="7.0" step="0.05" value="2.5"></div>
+                <div class="slider-item"><label>🔄 Roof Rotation (0-360°) <span id="roofRotVal">0</span></label><input type="range" id="roofRotate" min="0" max="360" step="90" value="0"></div>
+                <div class="slider-item"><label>⬅️ Roof X (Left/Right) <span id="roofXVal">0.00</span></label><input type="range" id="roofX" min="-2.5" max="2.5" step="0.03" value="0"></div>
+                <div class="slider-item"><label>⬆️ Roof Y (Up/Down) <span id="roofYVal">1.20</span></label><input type="range" id="roofY" min="-0.8" max="3.0" step="0.02" value="1.2"></div>
+                <div class="slider-item"><label>➡️ Roof Z (Forward/Back) <span id="roofZVal">0.00</span></label><input type="range" id="roofZ" min="-2.5" max="2.5" step="0.03" value="0"></div>
+                <div class="slider-item"><label>🔄 Front/Back Global Shift Z <span id="fbDistVal">0.00</span></label><input type="range" id="fbDist" min="-5" max="5" step="0.02" value="0"></div>
+            </div>
+
+            <!-- Simplify & Export -->
+            <div class="action-row">
+                <div class="slider-item"><label>🧩 Simplification Keep (%) <span id="simplifyKeepVal">40</span></label><input type="range" id="simplifyKeep" min="1" max="100" step="1" value="40"></div>
+                <button id="simplifyBtn">✨ Simplify Model</button>
+                <button id="downloadBtn" disabled>📦 Download GLB</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="viewer"></div>
+    <div class="status" id="statusMsg">📌 Upload Front + Depth. Top component fully respects Background Cutout & Edge Filter.</div>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { SimplifyModifier } from 'three/addons/modifiers/SimplifyModifier.js';
+    import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+
+    // ---------- DOM Elements ----------
+    const files = {
+        frontImg: document.getElementById('frontImg'), frontDepth: document.getElementById('frontDepth'),
+        backImg: document.getElementById('backImg'), backDepth: document.getElementById('backDepth'),
+        sideLeftImg: document.getElementById('sideLeftImg'), sideLeftDepth: document.getElementById('sideLeftDepth'),
+        sideRightImg: document.getElementById('sideRightImg'), sideRightDepth: document.getElementById('sideRightDepth'),
+        topImg: document.getElementById('topImg'), topDepth: document.getElementById('topDepth')
+    };
+    
+    const sliders = {
+        meshDetail: document.getElementById('meshDetail'), bgThreshold: document.getElementById('bgThreshold'),
+        tearThreshold: document.getElementById('tearThreshold'),
+        frontDepthFactor: document.getElementById('frontDepthFactor'), backDepthFactor: document.getElementById('backDepthFactor'),
+        sideDepth: document.getElementById('sideDepth'), topDepthFactor: document.getElementById('topDepthFactor'),
+        sidesLen: document.getElementById('sidesLen'), sidesDist: document.getElementById('sidesDist'),
+        fbDist: document.getElementById('fbDist'), backOffsetZ: document.getElementById('backOffsetZ'),
+        roofRotate: document.getElementById('roofRotate'), roofX: document.getElementById('roofX'),
+        roofY: document.getElementById('roofY'), roofZ: document.getElementById('roofZ'),
+        topWidth: document.getElementById('topWidth'), topDepthDim: document.getElementById('topDepthDim'),
+        simplifyKeep: document.getElementById('simplifyKeep')
+    };
+
+    const simplifyBtn = document.getElementById('simplifyBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusDiv = document.getElementById('statusMsg');
+    const viewerDiv = document.getElementById('viewer');
+
+    // ---------- Three.js State ----------
+    let scene, camera, renderer, controls, groundPlane;
+    let activeMeshes = [];
+    let leftSideMesh = null, rightSideMesh = null, frontMeshObj = null, backMeshObj = null, topMeshObj = null;
+    let leftSideBasePosition = new THREE.Vector3();
+    let rightSideBasePosition = new THREE.Vector3();
+    let currentStitchId = 0;
+    let depthMidCache = 0;
+
+    // ---------- Scene Management ----------
+    function clearScene() {
+        if (!scene) return;
+        activeMeshes.forEach(obj => {
+            if (obj.parent) scene.remove(obj);
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) { 
+                if (obj.material.map) obj.material.map.dispose(); 
+                obj.material.dispose(); 
+            }
+        });
+        activeMeshes = []; 
+        leftSideMesh = null; rightSideMesh = null; 
+        frontMeshObj = null; backMeshObj = null; topMeshObj = null;
+    }
+
+    function initThree() {
+        if (renderer) return;
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x030712);
+        scene.fog = new THREE.FogExp2(0x030712, 0.008);
+        
+        camera = new THREE.PerspectiveCamera(42, viewerDiv.clientWidth/viewerDiv.clientHeight, 0.05, 30);
+        camera.position.set(2.8, 2.2, 4.5);
+        camera.lookAt(0, 0.4, 0);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+        renderer.setSize(viewerDiv.clientWidth, viewerDiv.clientHeight);
+        renderer.shadowMap.enabled = true;
+        viewerDiv.appendChild(renderer.domElement);
+        
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.06;
+        controls.target.set(0, 0.4, 0);
+        controls.update();
+
+        const ambient = new THREE.AmbientLight(0x3a4466, 0.68);
+        scene.add(ambient);
+        const mainDir = new THREE.DirectionalLight(0xfff5e0, 1.3);
+        mainDir.position.set(2.5, 3.2, 2);
+        mainDir.castShadow = true;
+        scene.add(mainDir);
+        const fill = new THREE.PointLight(0x4f7faa, 0.55);
+        fill.position.set(-1, 1.5, 1.5);
+        scene.add(fill);
+        const rim = new THREE.PointLight(0xffaa66, 0.5);
+        rim.position.set(0.5, 1.2, -2.5);
+        scene.add(rim);
+        
+        const groundGeom = new THREE.PlaneGeometry(8, 8);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1e2e, roughness: 0.8, metalness: 0.2, transparent: true, opacity: 0.35 });
+        groundPlane = new THREE.Mesh(groundGeom, groundMat);
+        groundPlane.rotation.x = -Math.PI / 2;
+        groundPlane.position.y = -1.9;
+        groundPlane.receiveShadow = true;
+        scene.add(groundPlane);
+        const grid = new THREE.GridHelper(7, 20, 0x5f7fbf, 0x2a3a5a);
+        grid.position.y = -1.85;
+        grid.material.transparent = true;
+        grid.material.opacity = 0.2;
+        scene.add(grid);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = viewerDiv.clientWidth / viewerDiv.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(viewerDiv.clientWidth, viewerDiv.clientHeight);
+        });
+    }
+
+    // ---------- Texture & Depth with universal background cutout ----------
+    function loadTextureFromFile(file) {
+        return new Promise((resolve, reject) => {
+            if (!file) return resolve(null);
+            const url = URL.createObjectURL(file);
+            new THREE.TextureLoader().load(url, tex => { URL.revokeObjectURL(url); resolve(tex); }, undefined, err => reject(err));
+        });
+    }
+
+    // Applies bgThreshold to zero-out background depth values (common for all components including top)
+    async function parseDepthTxt(file) {
+        if (!file) return null;
+        const text = await file.text();
+        const lines = text.trim().split(/\r?\n/);
+        const values = new Float32Array(lines.length);
+        const bgThresh = parseFloat(sliders.bgThreshold.value);
+        for (let i = 0; i < lines.length; i++) {
+            let v = parseFloat(lines[i]); if (isNaN(v)) v = 0;
+            let norm = Math.min(65535, Math.max(0, v)) / 65535.0;
+            values[i] = norm < bgThresh ? 0.0 : norm;
+        }
+        return values;
+    }
+
+    // Standard displaced plane (front, back, sides)
+    function createDisplacedPlane(texture, depthArray, imgW, imgH, planeWidth, planeHeight, axis, depthScale, detailPercent, tearThreshold) {
+        if (!texture || !depthArray) return null;
+        let segW = Math.max(4, Math.floor((imgW-1) * detailPercent/100));
+        let segH = Math.max(4, Math.floor((imgH-1) * detailPercent/100));
+        const geom = new THREE.PlaneGeometry(planeWidth, planeHeight, segW, segH);
+        const pos = geom.attributes.position, uvs = geom.attributes.uv;
+        for (let i = 0; i < pos.count; i++) {
+            const u = uvs.getX(i), v = uvs.getY(i);
+            const px = Math.min(imgW-1, Math.floor(u * (imgW-1)));
+            const py = Math.min(imgH-1, Math.floor((1-v) * (imgH-1)));
+            const disp = (depthArray[py * imgW + px] || 0) * depthScale;
+            if (axis === 'Z') pos.setZ(i, disp);
+            else if (axis === 'negZ') pos.setZ(i, -disp);
+        }
+        const indices = geom.getIndex().array;
+        const newIndices = [];
+        const maxGapZ = tearThreshold * depthScale;
+        for (let i = 0; i < indices.length; i += 3) {
+            const a = indices[i], b = indices[i+1], c = indices[i+2];
+            const zA = pos.getZ(a), zB = pos.getZ(b), zC = pos.getZ(c);
+            // Remove triangles where all vertices have near-zero depth (background cutout)
+            if (Math.abs(zA) < 0.0001 && Math.abs(zB) < 0.0001 && Math.abs(zC) < 0.0001) continue;
+            if (tearThreshold < 1.0 && (Math.abs(zA - zB) > maxGapZ || Math.abs(zA - zC) > maxGapZ || Math.abs(zB - zC) > maxGapZ)) continue;
+            newIndices.push(a, b, c);
+        }
+        geom.setIndex(newIndices);
+        geom.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide, roughness: 0.55, metalness: 0.1, transparent: true, alphaTest: 0.05 });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        return mesh;
+    }
+
+    // Top plane with background cutout and edge filter (identical logic)
+    function createTopPlane(texture, depthArray, imgW, imgH, widthX, depthZ, depthScale, detailPercent, tearThreshold) {
+        if (!texture || !depthArray) return null;
+        const segX = Math.max(4, Math.floor((imgW-1) * detailPercent/100));
+        const segZ = Math.max(4, Math.floor((imgH-1) * detailPercent/100));
+        const geom = new THREE.BufferGeometry();
+        const vertices = [], uvs = [], indices = [];
+        for (let i = 0; i <= segX; i++) {
+            const x = -widthX/2 + (i / segX) * widthX;
+            for (let j = 0; j <= segZ; j++) {
+                const z = -depthZ/2 + (j / segZ) * depthZ;
+                vertices.push(x, 0, z);
+                uvs.push(i / segX, j / segZ);
+            }
+        }
+        for (let i = 0; i < segX; i++) {
+            for (let j = 0; j < segZ; j++) {
+                const a = i * (segZ+1) + j;
+                const b = i * (segZ+1) + j + 1;
+                const c = (i+1) * (segZ+1) + j;
+                const d = (i+1) * (segZ+1) + j + 1;
+                indices.push(a, b, c, b, d, c);
+            }
+        }
+        geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vertices), 3));
+        geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+        geom.setIndex(indices);
+        const posAttr = geom.attributes.position;
+        const uvAttr = geom.attributes.uv;
+        const maxGapY = tearThreshold * depthScale;
+        
+        // Displace Y based on depth, after background cutout (depth values already zeroed)
+        for (let i = 0; i < posAttr.count; i++) {
+            const u = uvAttr.getX(i), v = uvAttr.getY(i);
+            const px = Math.min(imgW-1, Math.floor(u * (imgW-1)));
+            const py = Math.min(imgH-1, Math.floor((1 - v) * (imgH-1)));
+            const disp = (depthArray[py * imgW + px] || 0) * depthScale;
+            posAttr.setY(i, disp);
+        }
+        
+        // Remove triangles where all three vertices have near-zero Y (background cutout)
+        const newIndices = [];
+        for (let i = 0; i < indices.length; i += 3) {
+            const a = indices[i], b = indices[i+1], c = indices[i+2];
+            const yA = posAttr.getY(a), yB = posAttr.getY(b), yC = posAttr.getY(c);
+            if (Math.abs(yA) < 0.0005 && Math.abs(yB) < 0.0005 && Math.abs(yC) < 0.0005) continue;
+            if (tearThreshold < 1.0 && (Math.abs(yA - yB) > maxGapY || Math.abs(yA - yC) > maxGapY || Math.abs(yB - yC) > maxGapY)) continue;
+            newIndices.push(a, b, c);
+        }
+        geom.setIndex(newIndices);
+        geom.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide, roughness: 0.6, metalness: 0.1, transparent: true, alphaTest: 0.05 });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true; mesh.receiveShadow = true;
+        return mesh;
+    }
+
+    function getMaxLocalZ(mesh) {
+        if (!mesh || !mesh.geometry) return 0;
+        const pos = mesh.geometry.attributes.position;
+        let max = 0;
+        for (let i = 0; i < pos.count; i++) { const z = pos.getZ(i); if (z > max) max = z; }
+        return max;
+    }
+
+    // Dynamic transforms (non-destructive)
+    function updateTransforms() {
+        const sideDist = parseFloat(sliders.sidesDist.value);
+        const len = parseFloat(sliders.sidesLen.value);
+        const globalFbShift = parseFloat(sliders.fbDist.value);
+        const backIndependent = parseFloat(sliders.backOffsetZ.value);
+        const roofRot = parseFloat(sliders.roofRotate.value);
+        const roofX = parseFloat(sliders.roofX.value);
+        const roofY = parseFloat(sliders.roofY.value);
+        const roofZ = parseFloat(sliders.roofZ.value);
+
+        document.getElementById('sidesDistVal').textContent = sideDist.toFixed(2);
+        document.getElementById('sidesLenVal').textContent = len.toFixed(2);
+        document.getElementById('fbDistVal').textContent = globalFbShift.toFixed(2);
+        document.getElementById('backOffsetZVal').textContent = backIndependent.toFixed(2);
+        document.getElementById('roofRotVal').textContent = roofRot;
+        document.getElementById('roofXVal').textContent = roofX.toFixed(2);
+        document.getElementById('roofYVal').textContent = roofY.toFixed(2);
+        document.getElementById('roofZVal').textContent = roofZ.toFixed(2);
+
+        if (leftSideMesh) {
+            leftSideMesh.position.copy(leftSideBasePosition).add(new THREE.Vector3(sideDist, 0, 0));
+            leftSideMesh.scale.set(len, 1, 1);
+        }
+        if (rightSideMesh) {
+            rightSideMesh.position.copy(rightSideBasePosition).add(new THREE.Vector3(-sideDist, 0, 0));
+            rightSideMesh.scale.set(len, 1, 1);
+        }
+        if (frontMeshObj) frontMeshObj.position.set(0, 0, -globalFbShift);
+        if (backMeshObj) {
+            let baseZ = -0.01 + globalFbShift;
+            backMeshObj.position.set(0, 0, baseZ + backIndependent);
+        }
+        if (topMeshObj) {
+            topMeshObj.position.set(roofX, roofY, depthMidCache + roofZ);
+            topMeshObj.rotation.y = roofRot * Math.PI / 180;
+        }
+    }
+
+    // ---------- Main Stitching (full rebuild) ----------
+    async function stitchScene() {
+        if (!files.frontImg.files[0] || !files.frontDepth.files[0]) {
+            statusDiv.innerHTML = "❌ Front image and Depth TXT are required."; return;
+        }
+        const stitchId = ++currentStitchId;
+        statusDiv.innerHTML = "📦 Generating geometry with background cutout applied to ALL components including top...";
+        downloadBtn.disabled = true;
+        try {
+            const frontDepthScale = parseFloat(sliders.frontDepthFactor.value);
+            const backDepthScale = parseFloat(sliders.backDepthFactor.value);
+            const sideScale = parseFloat(sliders.sideDepth.value);
+            const topScale = parseFloat(sliders.topDepthFactor.value);
+            const detail = parseFloat(sliders.meshDetail.value);
+            const tear = parseFloat(sliders.tearThreshold.value);
+            const customTopWidth = parseFloat(sliders.topWidth.value);
+            const customTopDepth = parseFloat(sliders.topDepthDim.value);
+            
+            document.getElementById('topWidthVal').textContent = customTopWidth.toFixed(2);
+            document.getElementById('topDepthDimVal').textContent = customTopDepth.toFixed(2);
+            
+            const frontTex = await loadTextureFromFile(files.frontImg.files[0]);
+            const frontDepthArr = await parseDepthTxt(files.frontDepth.files[0]);
+            if (stitchId !== currentStitchId) return;
+            const imgW = frontTex.image.width, imgH = frontTex.image.height;
+            initThree();
+            clearScene();
+
+            const frontWidth = 4.0, frontHeight = frontWidth * (imgH/imgW);
+            const frontMesh = createDisplacedPlane(frontTex, frontDepthArr, imgW, imgH, frontWidth, frontHeight, 'Z', frontDepthScale, detail, tear);
+            scene.add(frontMesh); activeMeshes.push(frontMesh); frontMeshObj = frontMesh;
+            const maxFrontZ = getMaxLocalZ(frontMesh);
+            
+            let maxBackZ = 0;
+            if (files.backImg.files[0] && files.backDepth.files[0]) {
+                const backTex = await loadTextureFromFile(files.backImg.files[0]);
+                const backDepthArr = await parseDepthTxt(files.backDepth.files[0]);
+                if (stitchId !== currentStitchId) return;
+                const backMesh = createDisplacedPlane(backTex, backDepthArr, backTex.image.width, backTex.image.height, frontWidth, frontHeight, 'Z', backDepthScale, detail, tear);
+                backMesh.position.set(0, 0, -0.01);
+                backMesh.rotation.y = Math.PI;
+                scene.add(backMesh); activeMeshes.push(backMesh); backMeshObj = backMesh;
+                maxBackZ = getMaxLocalZ(backMesh);
+            }
+            const totalDepth = maxFrontZ + maxBackZ + 0.04;
+            depthMidCache = (maxFrontZ - maxBackZ) / 2;
+
+            async function buildSide(imgFile, depthFile, axis) {
+                if (!imgFile || !depthFile) return null;
+                const tex = await loadTextureFromFile(imgFile);
+                const dArr = await parseDepthTxt(depthFile);
+                if (stitchId !== currentStitchId) return null;
+                return createDisplacedPlane(tex, dArr, tex.image.width, tex.image.height, totalDepth, frontHeight, axis, sideScale, detail, tear);
+            }
+            leftSideMesh = await buildSide(files.sideLeftImg.files[0], files.sideLeftDepth.files[0], 'negZ');
+            if (leftSideMesh) {
+                leftSideMesh.position.set(-frontWidth/2 - 0.02, 0, depthMidCache);
+                leftSideMesh.rotation.y = Math.PI/2;
+                scene.add(leftSideMesh); activeMeshes.push(leftSideMesh);
+                leftSideBasePosition.copy(leftSideMesh.position);
+            }
+            rightSideMesh = await buildSide(files.sideRightImg.files[0], files.sideRightDepth.files[0], 'negZ');
+            if (rightSideMesh) {
+                rightSideMesh.position.set(frontWidth/2 + 0.02, 0, depthMidCache);
+                rightSideMesh.rotation.y = -Math.PI/2;
+                scene.add(rightSideMesh); activeMeshes.push(rightSideMesh);
+                rightSideBasePosition.copy(rightSideMesh.position);
+            }
+            
+            // TOP component - depth already filtered by parseDepthTxt (bgThreshold applied)
+            if (files.topImg.files[0] && files.topDepth.files[0]) {
+                const topTex = await loadTextureFromFile(files.topImg.files[0]);
+                const topDepthArr = await parseDepthTxt(files.topDepth.files[0]);
+                if (stitchId !== currentStitchId) return;
+                const topMesh = createTopPlane(topTex, topDepthArr, topTex.image.width, topTex.image.height, customTopWidth, customTopDepth, topScale, detail, tear);
+                if (topMesh) {
+                    scene.add(topMesh); activeMeshes.push(topMesh); topMeshObj = topMesh;
+                } else topMeshObj = null;
+            } else topMeshObj = null;
+
+            updateTransforms();
+            controls.target.set(0, 0.3, 0);
+            controls.update();
+            statusDiv.innerHTML = `✅ Model ready | Background cutout: ${(parseFloat(sliders.bgThreshold.value)*100).toFixed(1)}% depth threshold applied to all, including top. Top W:${customTopWidth.toFixed(2)} D:${customTopDepth.toFixed(2)}`;
+            downloadBtn.disabled = false;
+        } catch (err) { statusDiv.innerHTML = `❌ Error: ${err.message}`; console.error(err); }
+    }
+
+    // Simplify & Export
+    function simplifyMeshes() {
+        if (activeMeshes.length === 0) { statusDiv.innerHTML = "⚠️ No mesh to simplify."; return; }
+        const keep = parseFloat(sliders.simplifyKeep.value) / 100;
+        document.getElementById('simplifyKeepVal').textContent = Math.round(keep*100);
+        const meshes = [frontMeshObj, backMeshObj, leftSideMesh, rightSideMesh, topMeshObj].filter(m => m);
+        let totalTri = 0;
+        meshes.forEach(mesh => {
+            const geom = mesh.geometry;
+            if (!geom || !geom.index) return;
+            totalTri += geom.index.count / 3;
+            const target = Math.max(1, Math.floor((geom.index.count/3) * keep));
+            try {
+                const modifier = new SimplifyModifier(geom);
+                const newGeom = modifier.modify(target);
+                if (newGeom) { geom.dispose(); mesh.geometry = newGeom; }
+            } catch(e) { console.warn(e); }
+        });
+        const afterTri = meshes.reduce((s, m) => s + (m.geometry.index ? m.geometry.index.count/3 : 0), 0);
+        statusDiv.innerHTML = `✨ Simplified: ${Math.round(totalTri)} → ${Math.round(afterTri)} triangles`;
+        downloadBtn.disabled = false;
+    }
+
+    function exportGLB() {
+        if (activeMeshes.length === 0) { statusDiv.innerHTML = "⚠️ No model to export."; return; }
+        const group = new THREE.Group();
+        activeMeshes.forEach(m => {
+            const clone = m.clone();
+            clone.material = clone.material.clone();
+            clone.material.transparent = true;
+            if (clone.material.map) clone.material.map.needsUpdate = true;
+            group.add(clone);
+        });
+        const exporter = new GLTFExporter();
+        exporter.parse(group, (gltf) => {
+            const blob = new Blob([gltf], { type: 'application/octet-stream' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'depth_stitched_model.glb';
+            link.click();
+            URL.revokeObjectURL(link.href);
+            statusDiv.innerHTML = "📦 GLB exported (transparency & cutout preserved).";
+            group.traverse(c => { if(c.geometry) c.geometry.dispose(); if(c.material) { if(c.material.map) c.material.map.dispose(); c.material.dispose(); } });
+        }, { binary: true });
+    }
+
+    // Event binding
+    let rebuildTimeout;
+    function triggerRebuild() {
+        if (!files.frontImg.files[0] || !files.frontDepth.files[0]) return;
+        clearTimeout(rebuildTimeout);
+        rebuildTimeout = setTimeout(stitchScene, 150);
+    }
+    Object.values(files).forEach(inp => inp.addEventListener('change', triggerRebuild));
+    
+    const rebuildSliders = ['meshDetail','bgThreshold','tearThreshold','frontDepthFactor','backDepthFactor','sideDepth','topDepthFactor','topWidth','topDepthDim'];
+    rebuildSliders.forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', (e) => { 
+            if(id === 'meshDetail') document.getElementById('meshDetailVal').textContent = e.target.value;
+            if(id === 'bgThreshold') document.getElementById('bgThresholdVal').textContent = parseFloat(e.target.value).toFixed(3);
+            if(id === 'tearThreshold') document.getElementById('tearThresholdVal').textContent = parseFloat(e.target.value).toFixed(2);
+            if(id === 'frontDepthFactor') document.getElementById('frontDepthVal').textContent = parseFloat(e.target.value).toFixed(2);
+            if(id === 'backDepthFactor') document.getElementById('backDepthVal').textContent = parseFloat(e.target.value).toFixed(2);
+            if(id === 'sideDepth') document.getElementById('sideDepthVal').textContent = parseFloat(e.target.value).toFixed(2);
+            if(id === 'topDepthFactor') document.getElementById('topDepthVal').textContent = parseFloat(e.target.value).toFixed(2);
+            if(id === 'topWidth') document.getElementById('topWidthVal').textContent = parseFloat(e.target.value).toFixed(2);
+            if(id === 'topDepthDim') document.getElementById('topDepthDimVal').textContent = parseFloat(e.target.value).toFixed(2);
+            triggerRebuild(); 
+        });
+    });
+    
+    const transformSliders = ['sidesLen','sidesDist','fbDist','backOffsetZ','roofRotate','roofX','roofY','roofZ'];
+    transformSliders.forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('input', () => updateTransforms());
+    });
+    sliders.simplifyKeep.addEventListener('input', (e) => { document.getElementById('simplifyKeepVal').textContent = e.target.value; });
+    simplifyBtn.addEventListener('click', simplifyMeshes);
+    downloadBtn.addEventListener('click', exportGLB);
+</script>
+</body>
+</html>
